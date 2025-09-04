@@ -114,6 +114,10 @@ h1, h2, h3 { color: var(--clr-charcoal); }
 @media (min-width: 640px){ .map-height{ height: 74vh; } }
 @media (min-width: 1024px){ .map-height{ height: 80vh; } }
 
+/* Ensure Leaflet controls and canvas stay below sticky header */
+.leaflet-container { z-index: 0; }
+.leaflet-top, .leaflet-bottom { z-index: 0; }
+
 .map-filters{ margin-left: auto; margin-right: auto; padding-left: 0.75rem; padding-right: 0.75rem; }
 @media (min-width: 640px){ .map-filters{ max-width: 48rem; padding-left: 0; padding-right: 0; } }
 @media (min-width: 1024px){ .map-filters{ max-width: 42rem; } }

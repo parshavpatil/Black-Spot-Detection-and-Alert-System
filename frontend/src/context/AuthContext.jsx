@@ -37,6 +37,28 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  // Axios interceptor: auto-logout on 401/403 and redirect to login
+  useEffect(() => {
+    const id = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) {
+          setToken(null);
+          setUser(null);
+          try {
+            localStorage.removeItem("auth");
+          } catch {}
+          if (window.location.pathname !== "/login") {
+            window.location.href = "/login";
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(id);
+  }, []);
+
   const login = useCallback(async (email, password) => {
     const { data } = await axios.post(`${baseUrl}/api/auth/login`, { email, password });
     setToken(data.token);

@@ -1,5 +1,6 @@
 import React from "react";
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route, Link, Navigate } from "react-router-dom";
+import { useAuth } from "./context/AuthContext.jsx";
 import Header from "./components/Header.jsx";
 import Footer from "./components/Footer.jsx";
 import Home from "./pages/Home.jsx";
@@ -33,6 +34,10 @@ function StatisticsPage() {
 
 function App() {
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
+  function PrivateRoute({ element }) {
+    return isAuthenticated ? element : <Navigate to="/login" replace />;
+  }
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -47,10 +52,10 @@ function App() {
           >
             <Routes location={location}>
               <Route path="/" element={<Home />} />
-              <Route path="/report" element={<ReportPage />} />
+              <Route path="/report" element={<PrivateRoute element={<ReportPage />} />} />
               <Route path="/map" element={<MapPage />} />
               <Route path="/blackspots/:id" element={<BlackspotDetail />} />
-              <Route path="/statistics" element={<Statistics />} />
+              <Route path="/statistics" element={<PrivateRoute element={<Statistics />} />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
             </Routes>

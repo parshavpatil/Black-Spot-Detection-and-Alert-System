@@ -5,7 +5,7 @@ import L from "leaflet";
 import markerIcon2xUrl from "leaflet/dist/images/marker-icon-2x.png";
 import markerIconUrl from "leaflet/dist/images/marker-icon.png";
 import markerShadowUrl from "leaflet/dist/images/marker-shadow.png";
-import { blackspots } from "../data/blackspots.js";
+import { useApp } from "../context/AppContext.jsx";
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2xUrl,
@@ -16,7 +16,8 @@ L.Icon.Default.mergeOptions({
 function BlackspotDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const spot = useMemo(() => blackspots.find((s) => s.id === id), [id]);
+  const { blackspots } = useApp();
+  const spot = useMemo(() => blackspots.find((s) => s.id === id), [id, blackspots]);
 
   if (!spot) {
     return (
@@ -27,8 +28,9 @@ function BlackspotDetail() {
     );
   }
 
-  const position = [spot.lat, spot.lng];
-  const isAdmin = false; // TODO: replace with real auth
+  const hasCoords = Number.isFinite(spot.lat) && Number.isFinite(spot.lng);
+  const position = hasCoords ? [spot.lat, spot.lng] : [6.5244, 3.3792];
+  const isAdmin = false; // placeholder
 
   return (
     <div className="p-4">
@@ -79,7 +81,7 @@ function BlackspotDetail() {
           </div>
           <div className="md:col-span-1">
             <div className="w-full" style={{ height: "30vh" }}>
-              <MapContainer center={position} zoom={14} style={{ height: "100%", width: "100%" }}>
+              <MapContainer center={position} zoom={hasCoords ? 14 : 12} style={{ height: "100%", width: "100%" }}>
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

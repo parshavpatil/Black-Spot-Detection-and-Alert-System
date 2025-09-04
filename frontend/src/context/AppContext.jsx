@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { blackspots as initialBlackspots } from "../data/blackspots.js";
 
@@ -16,17 +16,33 @@ export function AppProvider({ children }) {
   }, []);
 
   // Report form state
-  const [reportForm, setReportForm] = useState({ location: "", description: "", severity: "", image: null });
+  const [reportForm, setReportForm] = useState({ location: "", description: "", severity: "", image: null, lat: "", lng: "" });
 
   const updateReportForm = useCallback((updates) => {
     setReportForm((prev) => ({ ...prev, ...updates }));
   }, []);
 
   const resetReportForm = useCallback(() => {
-    setReportForm({ location: "", description: "", severity: "", image: null });
+    setReportForm({ location: "", description: "", severity: "", image: null, lat: "", lng: "" });
   }, []);
 
   const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+  const toAbsolute = useCallback((u) => (u && u.startsWith("/") ? `${baseUrl}${u}` : u), [baseUrl]);
+
+  // Load blackspots from API on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await axios.get(`${baseUrl}/api/blackspots`);
+        if (Array.isArray(data)) {
+          const normalized = data.map((d) => ({ ...d, imageUrl: toAbsolute(d.imageUrl) }));
+          setBlackspots(normalized.length ? normalized : initialBlackspots);
+        }
+      } catch {
+        // keep initial data as fallback
+      }
+    })();
+  }, [baseUrl, toAbsolute]);
 
   const submitReport = useCallback(async () => {
     const data = new FormData();
@@ -34,27 +50,20 @@ export function AppProvider({ children }) {
     data.append("description", reportForm.description);
     data.append("severity", reportForm.severity);
     if (reportForm.image) data.append("image", reportForm.image);
+    if (reportForm.lat) data.append("lat", reportForm.lat);
+    if (reportForm.lng) data.append("lng", reportForm.lng);
 
     const res = await axios.post(`${baseUrl}/api/blackspots`, data, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
-    // Optionally add to local list if API returns created item
+    // Refresh list from API or optimistically add
     if (res?.data) {
-      setBlackspots((prev) => [{
-        id: res.data.id || `tmp-${Date.now()}`,
-        title: res.data.title || reportForm.location,
-        description: res.data.description || reportForm.description,
-        locationText: res.data.location || reportForm.location,
-        lat: res.data.lat || 6.5244,
-        lng: res.data.lng || 3.3792,
-        severity: res.data.severity || reportForm.severity || "low",
-        date: res.data.date || new Date().toISOString().slice(0,10),
-        imageUrl: res.data.imageUrl || "",
-      }, ...prev]);
+      const created = { ...res.data, imageUrl: toAbsolute(res.data.imageUrl) };
+      setBlackspots((prev) => [created, ...prev]);
     }
     return res;
-  }, [baseUrl, reportForm]);
+  }, [baseUrl, reportForm, toAbsolute]);
 
   const value = useMemo(() => ({
     blackspots,

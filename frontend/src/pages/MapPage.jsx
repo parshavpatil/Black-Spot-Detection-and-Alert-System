@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { MapContainer, TileLayer, Marker, Popup, Circle, CircleMarker } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import L from "leaflet";
+import appLogo from "../assets/logo.svg";
 import markerIcon2xUrl from "leaflet/dist/images/marker-icon-2x.png";
 import markerIconUrl from "leaflet/dist/images/marker-icon.png";
 import markerShadowUrl from "leaflet/dist/images/marker-shadow.png";
@@ -15,10 +16,13 @@ L.Icon.Default.mergeOptions({
 
 import { useApp } from "../context/AppContext.jsx";
 import AlertNotification from "../components/AlertNotification.jsx";
-import { getNearbyBlackspots, haversineDistanceMeters } from "../utils/distance.js";
+import axios from "axios";
+import { haversineDistanceMeters } from "../utils/distance.js";
+import { io } from "socket.io-client";
 
 function MapPage() {
   const { blackspots: sampleBlackspots, filters, setFilter } = useApp();
+  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
   const { severity, startDate, endDate } = filters;
   const [userPosition, setUserPosition] = useState(null);
   const [userAccuracy, setUserAccuracy] = useState(null);
@@ -42,6 +46,25 @@ function MapPage() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
+  // Socket.io live alerts
+  useEffect(() => {
+    const socket = io(baseUrl, { transports: ["websocket", "polling"], path: "/socket.io" });
+    socket.on("connect_error", () => {});
+    socket.on("alert:early", (payload) => {
+      if (!payload) return;
+      setAlertTarget({ spot: payload.spot, distanceMeters: payload.distanceMeters });
+      setAlertVisible(true);
+      setLastAlertSpotId(payload.spot?.id);
+      setLastAlertAt(Date.now());
+    });
+    const interval = setInterval(() => {
+      if (userPosition) {
+        socket.emit("location:update", { lat: userPosition[0], lng: userPosition[1] });
+      }
+    }, 1500);
+    return () => { clearInterval(interval); socket.close(); };
+  }, [baseUrl, userPosition]);
+
   const filtered = useMemo(() => {
     return sampleBlackspots.filter((s) => {
       if (severity && s.severity !== severity) return false;
@@ -51,8 +74,20 @@ function MapPage() {
     });
   }, [severity, startDate, endDate]);
 
-  const center = filtered.length > 0 ? [filtered[0].lat, filtered[0].lng] : [6.5244, 3.3792];
-  const bounds = filtered.length > 0 ? L.latLngBounds(filtered.map((s) => [s.lat, s.lng])) : null;
+  const withCoords = useMemo(() => filtered.filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng)), [filtered]);
+  const center = withCoords.length > 0 ? [withCoords[0].lat, withCoords[0].lng] : [6.5244, 3.3792];
+  const bounds = withCoords.length > 0 ? L.latLngBounds(withCoords.map((s) => [s.lat, s.lng])) : null;
+  const mapRef = useRef(null);
+
+  // Fix blank map when using animations: invalidate size after mount and on data changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    setTimeout(() => {
+      map.invalidateSize?.();
+      if (bounds) map.fitBounds(bounds);
+    }, 50);
+  }, [bounds]);
 
   const severityToColor = (s) => (s === "high" ? "#ef4444" : s === "medium" ? "#f59e0b" : "#10b981");
   const makeIcon = (s, { isNearby = false, isClosest = false } = {}) =>
@@ -66,42 +101,68 @@ function MapPage() {
       </div>`
     });
 
+  const userIcon = useMemo(() => L.icon({
+    iconUrl: appLogo,
+    iconRetinaUrl: appLogo,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    className: "user-location-icon",
+  }), []);
+
   // Proximity and alert handling
-  const proximity = useMemo(() => {
-    if (!userPosition) return { nearby: [], closest: null };
-    const nearby = getNearbyBlackspots(userPosition, filtered, { maxMeters: 600 });
-    const closest = nearby.length ? nearby[0] : null;
-    return { nearby, closest };
-  }, [userPosition, filtered]);
+  const [apiNearby, setApiNearby] = useState([]);
+  const [closest, setClosest] = useState(null);
+
+  // Fetch nearby from API whenever user position changes (debounced)
+  useEffect(() => {
+    if (!userPosition) return;
+    let cancelled = false;
+    const controller = new AbortController();
+    const fetchNearby = async () => {
+      try {
+        const { data } = await axios.get(`${baseUrl}/api/alerts/nearby`, {
+          params: { lat: userPosition[0], lng: userPosition[1], maxMeters: 600 },
+          signal: controller.signal,
+        });
+        if (cancelled) return;
+        const nearby = Array.isArray(data?.nearby) ? data.nearby : [];
+        setApiNearby(nearby);
+        setClosest(nearby[0] || null);
+      } catch {}
+    };
+    const t = setTimeout(fetchNearby, 300);
+    return () => { cancelled = true; controller.abort(); clearTimeout(t); };
+  }, [userPosition, baseUrl]);
 
   useEffect(() => {
     // Cooldown: 60s per spot to prevent spamming
     const COOLDOWN_MS = 60 * 1000;
     const now = Date.now();
-    const closest = proximity.closest;
-    if (!closest) {
+    const c = closest;
+    if (!c) {
       setAlertVisible(false);
       setAlertTarget(null);
       return;
     }
 
-    const withinEarly = closest.distanceMeters <= 600;
+    // Early alert threshold: 500m (alert when approaching, not after entering area)
+    const withinEarly = c.distanceMeters <= 500;
     if (!withinEarly) {
       setAlertVisible(false);
       setAlertTarget(null);
       return;
     }
 
-    const isNewSpot = closest.spot.id !== lastAlertSpotId;
+    const isNewSpot = c.id !== lastAlertSpotId;
     const cooldownPassed = now - lastAlertAt > COOLDOWN_MS;
     if (now < ackUntil) return; // acknowledged recently
     if (isNewSpot || cooldownPassed) {
-      setAlertTarget(closest);
+      setAlertTarget({ spot: c, distanceMeters: c.distanceMeters });
       setAlertVisible(true);
       setLastAlertAt(now);
-      setLastAlertSpotId(closest.spot.id);
+      setLastAlertSpotId(c.id);
     }
-  }, [proximity.closest, lastAlertAt, lastAlertSpotId]);
+  }, [closest, lastAlertAt, lastAlertSpotId, ackUntil]);
 
   return (
     <div className="p-4">
@@ -133,18 +194,23 @@ function MapPage() {
       </div>
 
       <div className="w-full map-height">
-        <MapContainer center={center} zoom={12} style={{ height: "100%", width: "100%" }} whenCreated={(map) => bounds && map.fitBounds(bounds)}>
+        <MapContainer
+          center={center}
+          zoom={12}
+          style={{ height: "100%", width: "100%" }}
+          whenCreated={(map) => { mapRef.current = map; if (bounds) map.fitBounds(bounds); setTimeout(() => map.invalidateSize?.(), 50); }}
+        >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {filtered.map((s) => {
+          {withCoords.map((s) => {
             const distance = userPosition ? haversineDistanceMeters(
               { lat: userPosition[0], lng: userPosition[1] },
               { lat: s.lat, lng: s.lng }
             ) : Infinity;
             const isNearby = Number.isFinite(distance) && distance <= 600;
-            const isClosest = proximity.closest?.spot?.id === s.id;
+            const isClosest = closest?.id === s.id;
             return (
               <React.Fragment key={s.id}>
                 <Circle
@@ -182,11 +248,7 @@ function MapPage() {
 
           {userPosition ? (
             <>
-              <CircleMarker
-                center={userPosition}
-                radius={6}
-                pathOptions={{ color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.9 }}
-              />
+              <Marker position={userPosition} icon={userIcon} />
               <Circle
                 center={userPosition}
                 radius={Math.max(userAccuracy || 0, 20)}
