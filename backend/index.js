@@ -1,12 +1,16 @@
 const express = require("express");
 const cors = require("cors");
-const mongoose = require("mongoose");
+const { connectDB } = require("./utils/db");
+const authRoutes = require("./routes/authRoutes");
 require("dotenv").config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Routes
+app.use("/api/auth", authRoutes);
 
 app.get("/api/health", (req, res) => {
     res.status(200).json({ status: "ok", uptime: process.uptime() });
@@ -28,16 +32,10 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI || "";
 
 async function start() {
     try {
-        if (MONGODB_URI) {
-            await mongoose.connect(MONGODB_URI);
-            console.log("Connected to MongoDB");
-        } else {
-            console.warn("MONGODB_URI not set. Starting server without database connection.");
-        }
+        await connectDB();
 
         app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);

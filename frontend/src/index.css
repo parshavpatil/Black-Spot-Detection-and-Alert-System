@@ -1,1 +1,119 @@
+/* Global fonts must come before other imports for PostCSS */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;600&display=swap");
 @import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Earthy theme variables */
+    --clr-primary: #2F5D50; /* Deep Evergreen */
+    --clr-secondary: #B06C49; /* Warm Clay */
+    --clr-accent: #D3A15C; /* Golden Sand */
+    --clr-charcoal: #2B2A28; /* Charcoal Slate */
+    --clr-surface: #E7E1D7; /* Dune Beige */
+    --clr-bg: #F6F2EA; /* Sandstone */
+    --clr-moss: #6F8F6A; /* Moss Green */
+
+    /* Legacy tokens kept for compatibility with Tailwind utilities if used */
+    --color-primary: 47 93 80; /* primary as rgb */
+    --color-secondary: 176 108 73; /* secondary as rgb */
+    --color-success: 111 143 106; /* moss as success */
+    --color-danger: 239 68 68; /* red-500 */
+  }
+
+  html, body, #root { height: 100%; }
+
+  body {
+    @apply text-stone-800;
+    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+    scroll-behavior: smooth;
+    background: var(--clr-bg);
+    color: var(--clr-charcoal);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  /* Simple fade-in animation for scroll reveals */
+  .fade-in {
+    animation: fade-in 0.5s ease-out both;
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .btn {
+    @apply inline-flex items-center justify-center rounded px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 0.5rem; padding: .625rem 1rem; font-size: .875rem; font-weight: 500;
+    transition: filter .15s ease, box-shadow .2s ease; cursor: pointer;
+    background: var(--clr-primary); color: #fff;
+    border: 1px solid color-mix(in oklab, var(--clr-primary) 80%, black);
+    box-shadow: 0 2px 8px color-mix(in oklab, var(--clr-primary) 20%, transparent);
+  }
+  .btn-primary:hover { filter: brightness(1.05); }
+  .btn-primary:focus { outline: 2px solid color-mix(in oklab, var(--clr-primary) 60%, white); outline-offset: 2px; }
+
+  .btn-secondary {
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 0.5rem; padding: .6rem 1rem; font-size: .875rem; font-weight: 500;
+    transition: background-color .15s ease; cursor: pointer;
+    background: transparent; color: var(--clr-secondary);
+    border: 1.5px solid var(--clr-secondary);
+  }
+  .btn-secondary:hover { background: color-mix(in oklab, var(--clr-secondary) 8%, white); }
+  .btn-danger {
+    @apply inline-flex items-center justify-center rounded px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .card {
+    background: var(--clr-surface);
+    border: 1px solid color-mix(in oklab, var(--clr-charcoal) 15%, white);
+    border-radius: .75rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  .input {
+    @apply w-full border border-stone-300 rounded px-3 py-2 bg-white;
+  }
+  .label {
+    @apply block text-sm font-medium mb-1;
+  }
+}
+
+/* Earthy theme helpers */
+.badge-accent{
+  background: color-mix(in oklab, var(--clr-accent) 15%, white);
+  color: var(--clr-charcoal);
+  border: 1px solid color-mix(in oklab, var(--clr-accent) 40%, white);
+  padding: .25rem .5rem; border-radius: .375rem; font-weight: 600; font-size: .75rem;
+}
+
+.section{
+  background: var(--clr-surface);
+  border: 1px solid color-mix(in oklab, var(--clr-charcoal) 12%, white);
+  border-radius: .75rem; padding: 1rem;
+}
+
+.header{
+  background: linear-gradient(180deg, color-mix(in oklab, var(--clr-primary) 10%, white), transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--clr-charcoal) 15%, white);
+}
+
+h1, h2, h3 { color: var(--clr-charcoal); }
+.muted { color: color-mix(in oklab, var(--clr-charcoal) 70%, white); }
+.link { color: var(--clr-primary); text-decoration: underline; }
+.link:hover { color: color-mix(in oklab, var(--clr-primary) 90%, black); }
+
+/* Map page layout tweaks */
+.map-height{ height: 68vh; }
+@media (min-width: 640px){ .map-height{ height: 74vh; } }
+@media (min-width: 1024px){ .map-height{ height: 80vh; } }
+
+.map-filters{ margin-left: auto; margin-right: auto; padding-left: 0.75rem; padding-right: 0.75rem; }
+@media (min-width: 640px){ .map-filters{ max-width: 48rem; padding-left: 0; padding-right: 0; } }
+@media (min-width: 1024px){ .map-filters{ max-width: 42rem; } }
