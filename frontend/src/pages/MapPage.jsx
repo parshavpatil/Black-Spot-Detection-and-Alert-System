@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import L from "leaflet";
-import appLogo from "../assets/logo.svg";
+import appLogo from "../assets/sentinel-eye.png";
 import markerIcon2xUrl from "leaflet/dist/images/marker-icon-2x.png";
 import markerIconUrl from "leaflet/dist/images/marker-icon.png";
 import markerShadowUrl from "leaflet/dist/images/marker-shadow.png";
@@ -24,6 +24,7 @@ function MapPage() {
   const { blackspots: sampleBlackspots, filters, setFilter } = useApp();
   const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
   const { severity, startDate, endDate } = filters;
+  console.log("[MapPage] Context blackspots length:", sampleBlackspots?.length, { filters });
   const [userPosition, setUserPosition] = useState(null);
   const [userAccuracy, setUserAccuracy] = useState(null);
   const [alertVisible, setAlertVisible] = useState(false);
@@ -66,15 +67,21 @@ function MapPage() {
   }, [baseUrl, userPosition]);
 
   const filtered = useMemo(() => {
-    return sampleBlackspots.filter((s) => {
+    const out = sampleBlackspots.filter((s) => {
       if (severity && s.severity !== severity) return false;
       if (startDate && s.date < startDate) return false;
       if (endDate && s.date > endDate) return false;
       return true;
     });
-  }, [severity, startDate, endDate]);
+    console.log("[MapPage] after filters count:", out.length);
+    return out;
+  }, [severity, startDate, endDate, sampleBlackspots]);
 
-  const withCoords = useMemo(() => filtered.filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng)), [filtered]);
+  const withCoords = useMemo(() => {
+    const withLatLng = filtered.filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+    console.log("[MapPage] withCoords count:", withLatLng.length);
+    return withLatLng;
+  }, [filtered]);
   const center = withCoords.length > 0 ? [withCoords[0].lat, withCoords[0].lng] : [6.5244, 3.3792];
   const bounds = withCoords.length > 0 ? L.latLngBounds(withCoords.map((s) => [s.lat, s.lng])) : null;
   const mapRef = useRef(null);
@@ -124,11 +131,14 @@ function MapPage() {
           params: { lat: userPosition[0], lng: userPosition[1], maxMeters: 600 },
           signal: controller.signal,
         });
+        console.log("[MapPage] nearby response:", data);
         if (cancelled) return;
         const nearby = Array.isArray(data?.nearby) ? data.nearby : [];
         setApiNearby(nearby);
         setClosest(nearby[0] || null);
-      } catch {}
+      } catch (e) {
+        if (!cancelled) console.error("[MapPage] nearby fetch error:", e?.message || e);
+      }
     };
     const t = setTimeout(fetchNearby, 300);
     return () => { cancelled = true; controller.abort(); clearTimeout(t); };

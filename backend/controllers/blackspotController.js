@@ -9,20 +9,56 @@ async function list(req, res, next) {
 
 async function create(req, res, next) {
     try {
-        const { location, description, severity, title, lat, lng } = req.body;
-        if (!location || !description || !severity) {
+        // Accept both current and legacy field names
+        const {
+            location,
+            locationName,
+            description,
+            severity,
+            title,
+            lat,
+            lng,
+            latitude,
+            longitude,
+            dateReported,
+        } = req.body;
+
+        const resolvedLocation = location || locationName;
+        const resolvedLat = lat !== undefined ? lat : latitude;
+        const resolvedLng = lng !== undefined ? lng : longitude;
+
+        if (!resolvedLocation || !description || !severity) {
             return res.status(400).json({ message: "location, description and severity are required" });
         }
+        // Validate coordinates if provided
+        if ((resolvedLat !== undefined && resolvedLng === undefined) || (resolvedLng !== undefined && resolvedLat === undefined)) {
+            return res.status(400).json({ message: "Both latitude and longitude must be provided" });
+        }
+        if (resolvedLat !== undefined && resolvedLng !== undefined) {
+            const latNum = Number(resolvedLat);
+            const lngNum = Number(resolvedLng);
+            if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
+                return res.status(400).json({ message: "Latitude/Longitude must be numbers" });
+            }
+            if (latNum < -90 || latNum > 90) {
+                return res.status(400).json({ message: "Latitude must be between -90 and 90" });
+            }
+            if (lngNum < -180 || lngNum > 180) {
+                return res.status(400).json({ message: "Longitude must be between -180 and 180" });
+            }
+        }
+
         const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
         const doc = await Blackspot.create({
-            title: title || location,
+            title: title || resolvedLocation,
             description,
-            location,
+            location: resolvedLocation,
             severity,
-            lat: lat ? Number(lat) : undefined,
-            lng: lng ? Number(lng) : undefined,
+            lat: resolvedLat !== undefined ? Number(resolvedLat) : undefined,
+            lng: resolvedLng !== undefined ? Number(resolvedLng) : undefined,
             imageUrl,
             createdBy: req.user ? req.user.id : undefined,
+            date: dateReported ? new Date(dateReported) : undefined,
         });
         return res.status(201).json(toPublic(doc));
     } catch (err) { next(err); }
@@ -61,12 +97,14 @@ function toPublic(doc) {
         id: doc.id,
         title: doc.title,
         description: doc.description,
-        location: doc.location,
-        locationText: doc.location,
-        lat: doc.lat,
-        lng: doc.lng,
+        location: doc.location || doc.locationName,
+        locationText: doc.location || doc.locationName,
+        lat: doc.lat ?? doc.latitude,
+        lng: doc.lng ?? doc.longitude,
         severity: doc.severity,
-        date: doc.createdAt?.toISOString?.().slice(0, 10) || undefined,
+        date: (doc.dateReported
+            ? new Date(doc.dateReported).toISOString().slice(0, 10)
+            : (doc.createdAt?.toISOString?.().slice(0, 10) || undefined)),
         imageUrl: doc.imageUrl || "",
     };
 }

@@ -33,12 +33,29 @@ export function AppProvider({ children }) {
   useEffect(() => {
     (async () => {
       try {
+        console.log("[AppContext] Fetching blackspots", { baseUrl });
         const { data } = await axios.get(`${baseUrl}/api/blackspots`);
+        console.log("[AppContext] /api/blackspots raw:", data);
         if (Array.isArray(data)) {
-          const normalized = data.map((d) => ({ ...d, imageUrl: toAbsolute(d.imageUrl) }));
+          const normalized = data.map((d) => ({
+            ...d,
+            // Normalize lat/lng from legacy fields if needed
+            lat: Number(d.lat ?? d.latitude),
+            lng: Number(d.lng ?? d.longitude),
+            // Normalize location text
+            location: d.location || d.locationName,
+            locationText: d.location || d.locationName,
+            // Normalize date
+            date: d.date || d.dateReported || d.createdAt,
+            imageUrl: toAbsolute(d.imageUrl),
+          }));
+          console.log("[AppContext] normalized:", normalized);
           setBlackspots(normalized.length ? normalized : initialBlackspots);
+        } else {
+          console.warn("[AppContext] Non-array response, keeping initial data");
         }
-      } catch {
+      } catch (err) {
+        console.error("[AppContext] Failed to fetch blackspots", err);
         // keep initial data as fallback
       }
     })();

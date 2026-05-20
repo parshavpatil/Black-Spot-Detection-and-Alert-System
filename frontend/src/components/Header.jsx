@@ -8,7 +8,7 @@ function Header() {
     <header className="sticky top-0 z-20 shadow-sm fade-in header backdrop-blur" style={{background: "var(--clr-surface)", borderBottom: "1px solid color-mix(in oklab, var(--clr-charcoal) 15%, white)"}}>
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-          <img src="/src/assets/logo.svg" alt="Blackspot logo" className="h-8 w-8" />
+          <img src="/src/assets/sentinel-eye.png" alt="Blackspot logo" className="h-8 w-8" />
           <span className="font-bold text-lg" style={{color: "var(--clr-charcoal)"}}>Blackspot Detection and Alert System</span>
         </Link>
         <nav className="relative flex items-center gap-4">
@@ -23,7 +23,7 @@ function Header() {
           <NavLink to="/report" className={({ isActive }) => `relative px-1 py-1 transition-colors ${isActive ? "font-semibold" : ""}`} style={({ isActive }) => ({ color: isActive ? "var(--clr-primary)" : "var(--clr-charcoal)" })}>
             {({ isActive }) => (
               <span className="relative">
-                Report Blackspot
+                Report Accident
                 {isActive && <span className="absolute left-0 -bottom-1 h-0.5 w-full rounded-full" style={{background: "var(--clr-primary)"}} />}
               </span>
             )}

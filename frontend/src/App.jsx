@@ -8,6 +8,7 @@ import ReportForm from "./components/ReportForm.jsx";
 import MapPage from "./pages/MapPage.jsx";
 import BlackspotDetail from "./pages/BlackspotDetail.jsx";
 import Statistics from "./pages/Statistics.jsx";
+import AdminBlackspots from "./pages/AdminBlackspots.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import { ToastContainer } from "react-toastify";
@@ -17,7 +18,7 @@ import { useLocation } from "react-router-dom";
 function ReportPage() {
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Report Blackspot</h1>
+      <h1 className="text-2xl font-bold mb-4">Report Accident</h1>
       <ReportForm />
     </div>
   );
@@ -56,6 +57,7 @@ function App() {
               <Route path="/map" element={<MapPage />} />
               <Route path="/blackspots/:id" element={<BlackspotDetail />} />
               <Route path="/statistics" element={<PrivateRoute element={<Statistics />} />} />
+              <Route path="/admin/blackspots" element={<PrivateRoute element={<AdminBlackspots />} />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
             </Routes>

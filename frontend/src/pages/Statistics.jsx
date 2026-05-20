@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ResponsiveContainer,
   PieChart,
@@ -12,7 +13,8 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import { blackspots } from "../data/blackspots.js";
+import axios from "axios";
+import { useApp } from "../context/AppContext.jsx";
 
 const COLORS = ["#10b981", "#f59e0b", "#ef4444"]; // green, amber, red
 
@@ -30,7 +32,8 @@ function buildSeverityData(spots) {
 
 function buildTimeSeries(spots) {
   const byMonth = spots.reduce((acc, s) => {
-    const month = s.date.slice(0, 7); // YYYY-MM
+    const d = s.date || s.dateReported || s.createdAt || "";
+    const month = typeof d === "string" ? d.slice(0, 7) : new Date(d).toISOString().slice(0, 7); // YYYY-MM
     acc[month] = (acc[month] || 0) + 1;
     return acc;
   }, {});
@@ -40,15 +43,36 @@ function buildTimeSeries(spots) {
 }
 
 function Statistics() {
-  const severityData = buildSeverityData(blackspots);
-  const timeSeries = buildTimeSeries(blackspots);
+  const { blackspots: contextSpots } = useApp();
+  const [spots, setSpots] = useState(contextSpots);
+  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-  const totals = {
-    all: blackspots.length,
-    low: blackspots.filter((s) => s.severity === "low").length,
-    medium: blackspots.filter((s) => s.severity === "medium").length,
-    high: blackspots.filter((s) => s.severity === "high").length,
-  };
+  // Live refresh: pull latest stats periodically
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    const fetchSpots = async () => {
+      try {
+        const { data } = await axios.get(`${baseUrl}/api/blackspots`, { signal: controller.signal });
+        if (!cancelled && Array.isArray(data)) setSpots(data);
+      } catch {}
+    };
+    fetchSpots();
+    const interval = setInterval(fetchSpots, 10000); // every 10s
+    return () => { cancelled = true; controller.abort(); clearInterval(interval); };
+  }, [baseUrl]);
+
+  // Compute charts from latest data (fallback to context on empty)
+  const effective = spots?.length ? spots : contextSpots;
+  const severityData = useMemo(() => buildSeverityData(effective), [effective]);
+  const timeSeries = useMemo(() => buildTimeSeries(effective), [effective]);
+
+  const totals = useMemo(() => ({
+    all: effective.length,
+    low: effective.filter((s) => s.severity === "low").length,
+    medium: effective.filter((s) => s.severity === "medium").length,
+    high: effective.filter((s) => s.severity === "high").length,
+  }), [effective]);
 
   const [counter, setCounter] = useState({ all: 0, low: 0, medium: 0, high: 0 });
   useEffect(() => {
@@ -67,11 +91,14 @@ function Statistics() {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [totals]);
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Statistics</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold">Statistics</h1>
+        <Link to="/admin/blackspots" className="btn-secondary">View All (Admin)</Link>
+      </div>
 
       <div className="grid gap-4 grid-cols-2 md:grid-cols-4 mb-6">
         <div className="card p-4 text-center">

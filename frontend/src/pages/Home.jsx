@@ -4,7 +4,10 @@ import { useApp } from "../context/AppContext.jsx";
 
 function useBlackspots() {
   const { blackspots } = useApp();
-  return blackspots;
+  return blackspots
+    .slice()
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    .slice(0, 3);
 }
 
 function Home() {
@@ -12,7 +15,7 @@ function Home() {
     <div className="p-4">
       <section className="max-w-6xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Welcome to Blackspot Reporter</h1>
+          <h1 className="text-3xl font-bold mb-2">Welcome to Blackspot Detection</h1>
           <p className="text-gray-700">
             Help make roads safer by reporting hazardous locations and exploring known
             blackspots on the map. Together we can improve road safety.
@@ -24,7 +27,7 @@ function Home() {
             to="/report"
             className="btn-primary"
           >
-            Report Blackspot
+            Report Accident
           </Link>
           <Link
             to="/map"
@@ -39,18 +42,18 @@ function Home() {
           {useBlackspots().map((spot) => (
             <article
               key={spot.id}
-              className="card overflow-hidden transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md"
+              className="card overflow-hidden transition-transform duration-200 hover:-translate-y-1 hover:shadow-lg rounded-xl border border-stone-200"
             >
               {spot.imageUrl ? (
                 <img src={spot.imageUrl} alt={spot.title} className="h-40 w-full object-cover" />
               ) : (
-                <div className="h-40 w-full bg-stone-200 flex items-center justify-center text-stone-500">
-                  <span className="text-sm">{spot.title}</span>
+                <div className="h-40 w-full bg-gradient-to-br from-stone-200 to-stone-100 flex items-center justify-center text-stone-600">
+                  <span className="text-sm font-medium">{spot.title}</span>
                 </div>
               )}
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-semibold text-lg">{spot.title}</h3>
+                  <h3 className="font-semibold text-lg tracking-tight">{spot.title}</h3>
                   <span
                     className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${
                       spot.severity === "high"
@@ -65,8 +68,9 @@ function Home() {
                 </div>
                 <p className="text-sm text-stone-700 mt-1 line-clamp-3">{spot.description}</p>
                 <div className="text-xs text-stone-600 mt-2">Location: {spot.locationText}</div>
-                <div className="pt-3">
+                <div className="pt-3 flex items-center justify-between">
                   <Link className="text-sm underline" to={`/blackspots/${spot.id}`}>View details</Link>
+                  <span className="text-[11px] text-stone-500">{spot.date}</span>
                 </div>
               </div>
             </article>

@@ -28,7 +28,14 @@ function ReportForm() {
 
   function validate(values) {
     const nextErrors = {};
-    if (!values.lat || !values.lng) nextErrors.location = "Please select a location on the map";
+    const latNum = values.lat !== "" && values.lat !== undefined ? Number(values.lat) : undefined;
+    const lngNum = values.lng !== "" && values.lng !== undefined ? Number(values.lng) : undefined;
+    if (latNum === undefined || lngNum === undefined || Number.isNaN(latNum) || Number.isNaN(lngNum)) {
+      nextErrors.location = "Provide latitude and longitude or pick on the map";
+    } else {
+      if (latNum < -90 || latNum > 90) nextErrors.location = "Latitude must be between -90 and 90";
+      if (lngNum < -180 || lngNum > 180) nextErrors.location = "Longitude must be between -180 and 180";
+    }
     if (!values.description.trim()) nextErrors.description = "Description is required";
     if (!values.severity) nextErrors.severity = "Severity is required";
     return nextErrors;
@@ -125,6 +132,27 @@ function ReportForm() {
       updateReportForm({ location: `${lat.toFixed(5)}, ${lng.toFixed(5)}` });
     }
   }, [updateReportForm]);
+
+  // Manual lat/lng change handlers: keep fields in sync with the map marker
+  const onLatChange = (e) => {
+    const value = e.target.value;
+    updateReportForm({ lat: value });
+    const latNum = Number(value);
+    const lngNum = Number(form.lng);
+    if (!Number.isNaN(latNum) && !Number.isNaN(lngNum) && latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180) {
+      setLocationFromCoords(latNum, lngNum);
+    }
+  };
+
+  const onLngChange = (e) => {
+    const value = e.target.value;
+    updateReportForm({ lng: value });
+    const latNum = Number(form.lat);
+    const lngNum = Number(value);
+    if (!Number.isNaN(latNum) && !Number.isNaN(lngNum) && latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180) {
+      setLocationFromCoords(latNum, lngNum);
+    }
+  };
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -227,6 +255,42 @@ function ReportForm() {
         ) : null}
       </div>
 
+      {/* Manual coordinate entry */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="relative">
+          <input
+            id="lat"
+            name="lat"
+            type="number"
+            step="any"
+            min="-90"
+            max="90"
+            value={form.lat || ""}
+            onChange={onLatChange}
+            className={`input peer placeholder-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 ${errors.location ? "border-red-500" : ""}`}
+            placeholder="Latitude"
+            aria-describedby={errors.location ? "location-error" : undefined}
+          />
+          <label htmlFor="lat" className={`absolute left-3 -top-2.5 bg-white px-1 text-xs transition-all peer-placeholder-shown:text-sm peer-placeholder-shown:top-2 peer-placeholder-shown:left-3 peer-focus:-top-2.5 peer-focus:text-xs ${errors.location ? "text-red-600" : "text-stone-600"}`}>Latitude (-90 to 90)</label>
+        </div>
+        <div className="relative">
+          <input
+            id="lng"
+            name="lng"
+            type="number"
+            step="any"
+            min="-180"
+            max="180"
+            value={form.lng || ""}
+            onChange={onLngChange}
+            className={`input peer placeholder-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 ${errors.location ? "border-red-500" : ""}`}
+            placeholder="Longitude"
+            aria-describedby={errors.location ? "location-error" : undefined}
+          />
+          <label htmlFor="lng" className={`absolute left-3 -top-2.5 bg-white px-1 text-xs transition-all peer-placeholder-shown:text-sm peer-placeholder-shown:top-2 peer-placeholder-shown:left-3 peer-focus:-top-2.5 peer-focus:text-xs ${errors.location ? "text-red-600" : "text-stone-600"}`}>Longitude (-180 to 180)</label>
+        </div>
+      </div>
+
       <div className="relative">
         <textarea
           id="description"
@@ -272,9 +336,7 @@ function ReportForm() {
         </div>
       </div>
 
-      {/* Hidden fields storing coordinates */}
-      <input type="hidden" name="lat" value={form.lat || ""} readOnly />
-      <input type="hidden" name="lng" value={form.lng || ""} readOnly />
+      {/* Hidden fields removed since we expose manual inputs above */}
 
       <div className="pt-2">
         <button
